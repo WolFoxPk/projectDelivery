@@ -1,0 +1,82 @@
+Estensione funzionalità: Tipo di ordine & logica prezzo
+✅ Nuovi attributi in Order
+Attributo	Tipo	Descrizione
+deliveryType	DeliveryType (enum)	Se è IN_HOUSE, TAKE_AWAY, o ONLINE
+withReservation	boolean	Se il cliente ha prenotato
+participants	int	Numero di persone se IN_HOUSE (min 1)
+
+📌 Nuovo Enum: DeliveryType
+javaCopiaModificapublic enum DeliveryType {
+    IN_HOUSE, TAKE_AWAY, ONLINE
+}
+🧠 Logica di Business (aggiornata)
+💸 Prezzo base = somma dei piatti
+Su questo si applicano le seguenti regole (in quest’ordine):
+💻 Se ONLINE
+Riduzione di 5 €
+Se withReservation = true: -2 € extra
+Aggiungere commissione fissa di 1.50 €
+🥡 Se TAKE_AWAY
+Aggiungere IVA del 22% al totale (dopo eventuali sconti)
+🍽 Se IN_HOUSE
+Per ogni partecipante, aggiungere 2 € di coperto
+participants >= 1 obbligatorio
+⚠️ Vincoli aggiuntivi
+Se IN_HOUSE, il campo participants è obbligatorio e deve essere ≥ 1
+Se ONLINE o TAKE_AWAY, participants può essere null o ignorato
+Non si possono ordinare più di 10 piatti
+I piatti devono esistere nel database
+📥 Aggiornamento DTO - OrderRequestDTO
+javaCopiaModificapublic class OrderRequestDTO {
+    private List<Long> dishIds;
+    private DeliveryType deliveryType;
+    private boolean withReservation;
+    private Integer participants; // obbligatorio solo per IN_HOUSE}
+📤 OrderResponseDTO (aggiornato)
+javaCopiaModificapublic class OrderResponseDTO {
+    private Long orderId;
+    private List<String> dishes;
+    private BigDecimal total;
+    private LocalDateTime createdAt;
+    private DeliveryType deliveryType;
+    private boolean withReservation;
+    private Integer participants;
+}
+🧠 Service – esempio di calcolo finale
+javaCopiaModificaBigDecimal total = sommaPrezziPiatti;
+if (order.getDeliveryType() == ONLINE) {
+    total = total.subtract(new BigDecimal("5.00"));
+    if (order.isWithReservation()) {
+        total = total.subtract(new BigDecimal("2.00"));
+    }
+    total = total.add(new BigDecimal("1.50")); // commissioni} else if (order.getDeliveryType() == TAKE_AWAY) {
+    total = total.multiply(new BigDecimal("1.22")); // + IVA} else if (order.getDeliveryType() == IN_HOUSE) {
+    total = total.add(new BigDecimal(order.getParticipants() * 2)); // coperto}
+✅ Aggiorniamo anche la validazione
+Se deliveryType == IN_HOUSE e participants == null → 400 Bad Request
+Se dishIds.size() > 10 → 400 Bad Request
+Se uno o più dishId non esistono → 404 Not Found
+
+
+-------------
+
+🧱 Struttura concettuale
+🍽 Dish Entity
+id: Long
+name: String
+price: BigDecimal
+type: DishType (enum)
+📌 Relazione: un piatto può comparire in più ordini.
+📦 Order Entity
+id: Long
+creationDate: LocalDateTime
+total: BigDecimal
+Relazione: List<OrderDish> (vedi sotto)
+🍽📦 OrderDish Entity (join table)
+id: Long
+order: Order
+dish: Dish
+📌 Serve per gestire la relazione molti-a-molti tra Order e Dish.
+
+
+
